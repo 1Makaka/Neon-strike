@@ -209,7 +209,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const IP = process.env.IP || '0.0.0.0';
+const IP = process.env.IP || '::'; // '::' означает, что сервер работает на всех адресах Alwaysdata
 
 http.listen(PORT, IP, () => {
     console.log(`СЕРВЕР ЗАПУЩЕН НА ПОРТУ: ${PORT}`);
