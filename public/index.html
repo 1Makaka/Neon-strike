@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON STRIKE | Online Shooter</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; color: white; }
+        
+        /* ————— ЗАДНИЙ ФОН МЕНЮ (ИМИТАЦИЯ ИГРЫ) ————— */
+        .menu-bg-visual {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            background: 
+                linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,247,255,0.1)),
+                radial-gradient(circle at 50% 50%, rgba(0,247,255,0.15) 0%, rgba(0,0,0,1) 80%);
+            filter: blur(8px);
+            overflow: hidden;
+        }
+        
+        .menu-bg-visual::before {
+            content: "";
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: 
+                linear-gradient(90deg, rgba(0,247,255,0.05) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(0,247,255,0.05) 1px, transparent 1px);
+            background-size: 100px 100px;
+            transform: perspective(500px) rotateX(60deg);
+            animation: moveGrid 20s linear infinite;
+        }
+
+        /* МЕНЮ И ОВЕРЛЕИ */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); z-index: 100; backdrop-filter: blur(2px); }
+        .menu-screen { display: none; flex-direction: column; align-items: center; }
+        .active-menu { display: flex; }
+        
+        h1 { font-size: 5rem; letter-spacing: 15px; text-shadow: 0 0 20px #00f7ff; margin-bottom: 2rem; color: #00f7ff; text-align: center;}
+        h2 { color: #00f7ff; margin-bottom: 1rem; }
+        
+        .menu-btn { width: 300px; padding: 15px; margin: 10px; background: rgba(0,0,0,0.4); border: 2px solid #00f7ff; color: #00f7ff; font-size: 1.2rem; cursor: pointer; transition: 0.3s; text-transform: uppercase; font-weight: bold; }
+        .menu-btn:hover { background: #00f7ff; color: #000; box-shadow: 0 0 30px #00f7ff; }
+        
+        input[type="text"] { padding: 10px; margin: 10px; width: 280px; font-size: 1.2rem; background: #111; color: #00f7ff; border: 1px solid #00f7ff; text-align: center; }
+        input[type="range"] { width: 280px; margin: 10px; accent-color: #00f7ff; }
+        label { font-size: 1.2rem; margin: 10px; color: #00f7ff; }
+        .server-list { max-height: 200px; overflow-y: auto; width: 300px; margin-bottom: 15px; border: 1px solid #00f7ff; padding: 10px; background: rgba(0,0,0,0.5); }
+        .server-item { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; transition: 0.2s; }
+        .server-item:hover { background: #00f7ff; color: #000; }
+
+        /* HUD */
+        #hud { position: absolute; width: 100%; height: 100%; display: none; pointer-events: none; z-index: 50; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid #00f7ff; transform: translate(-50%, -50%); display: none; border-radius: 50%; z-index: 60; transition: 0.2s; }
+        .bar-label { color: white; font-family: monospace; font-size: 12px; margin-top: 5px; }
+        #interaction-text { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 20px; font-weight: bold; text-shadow: 0 0 10px #000; display: none; z-index: 65; }
+
+        /* УВЕДОМЛЕНИЯ */
+        #notifications { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; z-index: 70; pointer-events: none; }
+        .notif { background: rgba(0, 247, 255, 0.2); border: 1px solid #00f7ff; padding: 10px 20px; margin-bottom: 5px; color: #00f7ff; font-weight: bold; text-transform: uppercase; border-radius: 5px; animation: fadeOut 3s forwards; }
+        @keyframes fadeOut { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* ЭКРАНЫ ПАУЗЫ И СМЕРТИ */
+        .game-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1000; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;"> <div id="menu-background-visual" class="menu-bg-visual"></div>
+
+    <div id="notifications"></div>
+    <div id="crosshair"></div>
+    <div id="interaction-text">Нажмите[E]</div>
+
+    <div id="hud">
+        <div style="position:fixed; left:20px; top:20px; width:200px; height:15px; background:rgba(255,0,0,0.2); border:1px solid red;">
+            <div id="health-bar" style="width:100%; height:100%; background:red; transition: width 0.2s;"></div>
+            <div class="bar-label">HEALTH</div>
+        </div>
+        <div style="position:fixed; right:20px; top:20px; width:200px; height:15px; background:rgba(0,247,255,0.2); border:1px solid #00f7ff;">
+            <div id="stamina-bar" style="width:100%; height:100%; background:#00f7ff; transition: width 0.1s;"></div>
+            <div class="bar-label" style="text-align:right;">STAMINA</div>
+        </div>
+        <div id="grenade-ui" style="position:fixed; right:20px; bottom:20px; color:#00ff00; font-family:monospace; font-size:24px; text-shadow: 0 0 10px #00ff00; font-weight:bold;">
+            ГРАНАТЫ (G): <span id="grenade-count">3</span>
+        </div>
+        <div id="ammo" style="position:fixed; bottom:30px; left:50%; transform:translateX(-50%); color:#00f7ff; font-family:monospace; font-size:28px; text-shadow: 0 0 10px #00f7ff; font-weight:bold;">
+            AMMO: <span id="ammo-count">100 / 200</span>
+        </div>
+    </div>
+
+    <div id="ui-overlay" class="overlay">
+        <div id="menu-main" class="menu-screen active-menu">
+            <h1>NEON STRIKE</h1>
+            <button class="menu-btn" onclick="startGame('single')">Одиночный режим</button>
+            <button class="menu-btn" onclick="showMenu('menu-multi')">Мультиплеер</button>
+            <button class="menu-btn" onclick="showMenu('menu-settings')">Настройки</button> 
+        </div>
+
+        <div id="menu-settings" class="menu-screen">
+            <h1>НАСТРОЙКИ</h1>
+            <label>Чувствительность мыши</label>
+            <input type="range" id="sens-slider" min="0.1" max="3" step="0.1" value="1.0" oninput="updateSettings()">
+            <label>Громкость эффектов</label>
+            <input type="range" id="vol-sfx-slider" min="0" max="1" step="0.05" value="0.5" oninput="updateSettings()">
+            <label>Громкость музыки</label>
+            <input type="range" id="vol-music-slider" min="0" max="1" step="0.05" value="0.3" oninput="updateSettings()">
+            <button class="menu-btn" onclick="showMenu('menu-main')" style="margin-top: 20px; border-color:#555; color:#aaa;">Назад</button>
+        </div>
+
+        <div id="menu-multi" class="menu-screen">
+            <h1>МУЛЬТИПЛЕЕР</h1>
+            <button class="menu-btn" onclick="showMenu('menu-create')">Создать сервер</button>
+            <button class="menu-btn" onclick="showMenu('menu-join')">Зайти на сервер</button>
+            <button class="menu-btn" onclick="showMenu('menu-main')" style="border-color:#555; color:#aaa;">Назад</button>
+        </div>
+
+        <div id="menu-create" class="menu-screen">
+            <h2>СОЗДАНИЕ СЕРВЕРА</h2>
+            <input type="text" id="create-servername" placeholder="Название сервера" value="Мой Сервер">
+            <input type="text" id="create-nick" placeholder="Введи ник" value="Player1">
+            <label><input type="checkbox" id="create-drones" checked> С дронами</label>
+            <button class="menu-btn" onclick="createServer()">СОЗДАТЬ</button>
+            <button class="menu-btn" onclick="showMenu('menu-multi')" style="border-color:#555; color:#aaa;">Назад</button>
+        </div>
+
+        <div id="menu-join" class="menu-screen">
+            <h2>СПИСОК СЕРВЕРОВ</h2>
+            <input type="text" id="join-nick" placeholder="Введи ник" value="Guest">
+            <div class="server-list" id="servers-list"></div>
+            <button class="menu-btn" onclick="showMenu('menu-multi')" style="border-color:#555; color:#aaa;">Назад</button>
+        </div>
+    </div>
+
+    <div id="pause-menu" class="game-overlay">
+        <h1 style="font-size: 3rem;">ПАУЗА</h1>
+        <button class="menu-btn" onclick="resumeGame()">ПРОДОЛЖИТЬ</button>
+        <button class="menu-btn" onclick="location.reload()" style="border-color: #ff0044; color: #ff0044;">ВЫЙТИ В МЕНЮ</button>
+    </div>
+
+    <div id="death-screen" class="game-overlay">
+        <h1 style="color: #ff0044; text-shadow: 0 0 20px #ff0044;">ВЫ ПОГИБЛИ</h1>
+        <button class="menu-btn" onclick="location.reload()">В МЕНЮ</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <script src="game.js"></script>
+    
+    <script>
+        const originalStartGame = window.startGame;
+        window.startGame = function(mode) {
+            document.getElementById('menu-background-visual').style.display = 'none';
+            if(typeof originalStartGame === 'function') originalStartGame(mode);
+        };
+    </script>
+
+</body>
+</html>
